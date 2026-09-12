@@ -4,6 +4,10 @@
 
 > ⚠️ 使用本工具前请先阅读 [DISCLAIMER.md](DISCLAIMER.md)（法律与责任声明）。
 
+## ▶ 想让 AI（Codex / Claude Code / OpenCode / Qwen Code / Zed / Cursor / Copilot）帮你下论文？
+
+看 [integrations/README.md](integrations/README.md) —— 一条命令接好 skill / MCP，之后直接对 AI 说「下这篇论文 DOI xxx」它就会自己跑。
+
 核心能力（**武大专属、别处没有**）：
 
 - **武大 CAS 自动登录** —— 经浏览器后端复用你的武大账号会话，无需每次手填
