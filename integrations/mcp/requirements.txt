@@ -1,1 +1,7 @@
-mcp>=1.0
+# WHU Paper Fetcher MCP server 依赖
+#
+# server.py 仅使用 Python 标准库实现 MCP stdio 协议，**无需** mcp 包。
+# 唯一前置条件：whu-paper-fetcher 本身已安装（见主仓库 README 的 pip install 步骤）。
+#
+# 若你希望用官方 mcp SDK 版本，可改为下方一行并替换 server.py：
+#   mcp[cli]>=1.0

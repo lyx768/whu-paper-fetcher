@@ -31,9 +31,8 @@ whu-paper-fetcher --help
 工具要用你的武大身份去图书馆下载，所以要把学号/密码存到本地（**只存在你自己电脑上，不会上传**）：
 
 ```bash
-python -m whu_paper_fetcher.scripts.whu_creds_input
-# 如果上面不行，从仓库运行：
-# python scripts/whu_creds_input.py
+# 在仓库目录下运行（脚本就在仓库的 scripts/ 里）：
+python scripts/whu_creds_input.py
 ```
 
 按提示输入你的武大学号（或 CAS 账号）和密码即可。
@@ -65,20 +64,18 @@ powershell -ExecutionPolicy Bypass -File integrations/install.ps1
 
 ### 如果你用 Zed / Cursor / GitHub Copilot（这一类是「编辑器里的 AI」）
 
-它们通过 MCP 协议接。先把 MCP server 依赖装上：
+它们通过 MCP 协议接。**server 是纯标准库实现，不需要额外装任何依赖**，只要 `whu-paper-fetcher` 本身已装好即可。
 
-```bash
-pip install "mcp[cli]"
-```
+关键点：`command` 必须是「装了 whu-paper-fetcher 的那个 python」。最省事的做法是指向你装包的 venv 的 python（下面示例用的是仓库自带的 `.venv`，你换成自己的路径即可）。
 
-然后按你用的编辑器，把下面这段配置加进去（把 `/绝对路径/到/whu-paper-fetcher/integrations/mcp/server.py` 换成你电脑上这个文件的实际路径）：
+按你用的编辑器，把下面这段配置加进去（**把路径换成你电脑上的实际路径**）：
 
 **Zed** — 编辑 `~/.config/zed/settings.json`，加：
 ```json
 {
   "context_servers": {
     "whu-paper-fetcher": {
-      "command": "python",
+      "command": "/绝对路径/到/whu-paper-fetcher/.venv/Scripts/python.exe",
       "args": ["/绝对路径/到/whu-paper-fetcher/integrations/mcp/server.py"],
       "env": {}
     }
@@ -91,27 +88,28 @@ pip install "mcp[cli]"
 {
   "mcpServers": {
     "whu-paper-fetcher": {
-      "command": "python",
+      "command": "/绝对路径/到/whu-paper-fetcher/.venv/Scripts/python.exe",
       "args": ["/绝对路径/到/whu-paper-fetcher/integrations/mcp/server.py"]
     }
   }
 }
 ```
 
-**GitHub Copilot (VS Code)** — 在项目根目录或用户目录放一个 `.mcp.json`，加：
+**GitHub Copilot (VS Code)** — 在用户目录的 `settings.json`（或项目根目录放 `.mcp.json`）加：
 ```json
 {
   "mcp": {
     "servers": {
       "whu-paper-fetcher": {
-        "command": "python",
+        "command": "/绝对路径/到/whu-paper-fetcher/.venv/Scripts/python.exe",
         "args": ["/绝对路径/到/whu-paper-fetcher/integrations/mcp/server.py"]
       }
     }
   }
 }
 ```
-然后重启 VS Code，在 Copilot Chat 里应该能看到 `whu-paper-fetcher` 的工具。
+> 如果你用 `pip install whu-paper-fetcher` 把包装到了系统 python（且 `whu-paper-fetcher` 在 PATH 上），那 `command` 直接写 `"python"` 也行。
+然后重启编辑器，在 AI 聊天里应该能看到 `fetch_paper` / `fetch_papers` 工具。
 
 ---
 
