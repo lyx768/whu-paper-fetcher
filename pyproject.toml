@@ -5,7 +5,7 @@ description = "武大专属文献全文获取工具：武大 CAS 自动登录 + 
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-authors = [{ name = "李缘翔" }]
+authors = [{ name = "风" }]
 keywords = ["whu", "ezproxy", "sciencedirect", "paper-download", "literature", "cas"]
 dependencies = [
     "requests>=2.28",
