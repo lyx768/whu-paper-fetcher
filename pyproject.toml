@@ -1,0 +1,29 @@
+[project]
+name = "whu-paper-fetcher"
+version = "0.1.0"
+description = "武大专属文献全文获取工具：武大 CAS 自动登录 + ersp EZproxy + ScienceDirect ARP 全文接口，OA 渠道兜底。"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "李缘翔" }]
+keywords = ["whu", "ezproxy", "sciencedirect", "paper-download", "literature", "cas"]
+dependencies = [
+    "requests>=2.28",
+    "toml>=0.10",
+]
+
+[project.optional-dependencies]
+# Playwright backend (portable, default for classmates without Kimi WebBridge)
+browser = ["playwright>=1.40"]
+# Stricter PDF verification (first-page text match against the target paper)
+verify = ["pymupdf>=1.23"]
+
+[project.scripts]
+whu-paper-fetcher = "whu_paper_fetcher.cli:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["whu_paper_fetcher*"]

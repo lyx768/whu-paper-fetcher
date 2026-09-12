@@ -1,0 +1,25 @@
+# ---- Local config & credentials (NEVER commit) ----
+config.toml
+creds.json
+*.creds.json
+whu_paper_fetcher/config.local.toml
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# ---- Downloaded outputs ----
+downloads/
+*.pdf
+dist/
+build/
+*.egg-info/
+
+# ---- OS / editor ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

@@ -1,0 +1,39 @@
+# ============================================================================
+# whu-paper-fetcher 配置示例
+# 复制本文件为 config.toml 并按需修改。config.toml 已被 .gitignore 忽略，不会上传。
+# 所有含个人信息的字段（学号、姓名、下载目录）都在这里配置，代码内部不写死。
+# ============================================================================
+
+[whu]
+# 武大CAS用户名（学号）。留空则优先用浏览器自动填充，或从 creds 文件读取。
+username = ""
+# 数据库保密协议弹窗会要求输入姓名（"请输入您的姓名"），填你的真实姓名。
+display_name = ""
+# 数据库导航门户与 ScienceDirect 的 ersp EZproxy 前缀，通常无需改动。
+metaersp = "https://whu.metaersp.cn/"
+ersp_sd  = "https://ersp.lib.whu.edu.cn/s/com/sciencedirect/www/G.https"
+
+[download]
+# PDF / 全文落盘目录
+output_dir = "~/Downloads/whu-papers"
+# 下载后核验：%PDF 头 + 首页文本与目标论文标题/作者匹配（需安装 pymupdf）
+verify = true
+
+[browser]
+# 浏览器后端："playwright"（便携，默认，同学用）或 "webbridge"（你的 Kimi WebBridge 栈）
+backend = "playwright"
+# Playwright 使用的浏览器
+playwright_browser = "chromium"
+# —— 仅当 backend = "webbridge" 时使用 ——
+webbridge_url = "http://127.0.0.1:10086/command"
+webbridge_session = "whu-lib-access"
+
+[oa]
+# OA 聚合查询用的邮箱（任意邮箱即可，用于礼貌池）。
+email = ""
+# 跳过 OA 兜底、直接走武大代理
+skip_oa = false
+
+[creds]
+# 存放 CAS 密码的本地文件（gitignore 已屏蔽）。由 scripts/whu_creds_input.py 写入。
+path = "~/.config/whu-paper-fetcher/creds.json"
