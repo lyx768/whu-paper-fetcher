@@ -37,3 +37,9 @@ skip_oa = false
 [creds]
 # 存放 CAS 密码的本地文件（gitignore 已屏蔽）。由 scripts/whu_creds_input.py 写入。
 path = "~/.config/whu-paper-fetcher/creds.json"
+
+[request]
+# 每篇论文之间的间隔秒数（越大越温和，默认 3）。
+delay_seconds = 3
+# 每日最多下载篇数（防过量触发出版商/学校限速，默认 50）。
+daily_limit = 50

@@ -2,12 +2,13 @@
 
 武大专属文献全文获取工具。输入 DOI / 论文 URL，自动拿到全文 PDF 或纯文本。
 
+> ⚠️ 使用本工具前请先阅读 [DISCLAIMER.md](DISCLAIMER.md)（法律与责任声明）。
+
 核心能力（**武大专属、别处没有**）：
 
 - **武大 CAS 自动登录** —— 经浏览器后端复用你的武大账号会话，无需每次手填
 - **`whu.metaersp.cn` 门户 SSO → `ersp.lib.whu.edu.cn` EZproxy** 的完整访问链路
 - **ScienceDirect ARP 纯文本全文接口** —— 免 TDM API key 直接拿到正文（这是本工具最有价值的部分）
-- **Cloudflare Turnstile** 挑战页的处置经验（切前台 + 站内跳新链接）
 - **OA 四连兜底** —— Unpaywall / Semantic Scholar / OpenAlex / Europe PMC，能白嫖先白嫖
 
 > 设计定位：服务武大同学。你只需 `pip install` + 配个武大账号，给 DOI 就能用。
@@ -37,6 +38,16 @@ pip install -e '.[verify]'            # + pymupdf（下载后做首页文本校�
 
 Playwright 还需装一次浏览器内核：`playwright install chromium`
 
+### macOS 用户
+
+- 建议用 Homebrew 装 Python：`brew install python3`，随后用 `python3 -m pip` 代替 `pip`
+- Playwright 的 Chromium 内核跨平台自动下载，无需手动装浏览器
+- 配置文件与凭证默认落在标准位置（Windows / Linux / macOS 一致）：
+  - 配置：`~/.config/whu-paper-fetcher/config.toml`
+  - 凭证：`~/.config/whu-paper-fetcher/creds.json`
+  - 下载目录：`~/Downloads/whu-papers`
+- 其余用法与 Windows / Linux 完全一致
+
 ---
 
 ## 配置
@@ -56,6 +67,8 @@ Playwright 还需装一次浏览器内核：`playwright install chromium`
    | `download.output_dir` | PDF / 全文落盘目录 |
    | `browser.backend` | `playwright`（默认，便携）或 `webbridge`（你的 Kimi WebBridge 栈） |
    | `oa.email` | OA 查询用邮箱（任意邮箱，礼貌池用） |
+   | `request.delay_seconds` | 每篇论文之间的间隔秒数（默认 3，越大越温和） |
+   | `request.daily_limit` | 每日最多下载篇数（默认 50，防过量触发限速） |
 
 2. 写入 CAS 密码（**本地文件，绝不进仓库**）：
 
@@ -98,16 +111,19 @@ whu-paper-fetcher --doi 10.xxxx/xxx --json
 | `playwright`（默认） | 同学 | 用 Playwright 驱动本机 Chromium，无第三方依赖。首次需手动过一次武大 SSO，之后由 creds 自动登录 |
 | `webbridge` | 你自己 | 复用 Kimi WebBridge 扩展 + 本地 daemon（`127.0.0.1:10086`），复用已登录的 Edge 会话 |
 
-> 注意：ScienceDirect 的 Cloudflare 挑战页在**隐藏/无头窗口**下可能挂起。
-> Playwright 后端默认以有头模式启动；若遇到挑战页卡死，把浏览器窗口放到前台再重试。
+> 注意：ScienceDirect 等站点可能出现人机验证（CAPTCHA / Turnstile）挑战页。
+> **本工具不提供绕过验证的方法**；遇到挑战页请手动完成验证后重试。Playwright 后端默认以有头模式启动，
+> 若遇到挑战页卡死，把浏览器窗口放到前台再重试。
 
 ---
 
 ## 安全与隐私
 
 - 你的 CAS 密码只存在本地 `creds.json`，**绝不写入代码、日志或对话**。
-- 本工具**仅复用你武大账号已有的真实访问权限**，不是破解付费墙；下载请遵守出版商与学校使用条款。
+- 本工具**仅复用你武大账号已有的真实访问权限**（经学校 EZproxy 授权通道），不是破解付费墙。
 - 自动化访问可能触发出版商速率限制 / 二次验证（MFA），此时需你手动过一次。
+- 内置请求节流（间隔 + 每日上限），请按默认配置使用，勿为追求速度关闭。
+- **使用即代表你已阅读并同意 [DISCLAIMER.md](DISCLAIMER.md) 的全部条款。**
 
 ---
 
@@ -115,7 +131,7 @@ whu-paper-fetcher --doi 10.xxxx/xxx --json
 
 - 武大 EZproxy 会话约 **1 天过期**，过期后重新运行会自动重登（除非触发 MFA）。
 - SD ARP 全文为纯文本；若需出版社排版版 PDF，走页面渲染兜底（版式非官方）。
-- Playwright 后端（同学默认路径）尚未在真实武大账号下完整回归测试，如遇 SSO / 挑战页选择器变化，请提 issue。
+- Playwright 后端已通过本地冒烟测试（见 `tests/`），但**真实武大 SSO 登录与网站结构变化**仍需你/同学实测；如遇选择器变化请提 issue。
 - 非 SD 出版商（Wiley / T&F / Springer 等）走 OA 兜底；未做各家 EZproxy 适配。
 
 ---

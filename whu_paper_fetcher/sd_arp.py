@@ -233,7 +233,7 @@ def save_article_pdf(backend, pii, config, pdf_path):
         time.sleep(3)
         backend.eval_js("location.href=%s" % json.dumps(article_url))
         time.sleep(10)
-        # 切前台再渲染，避免隐藏窗口下 Cloudflare 挂死
+        # 切前台再渲染，有头模式下更稳
         try:
             backend.cdp("Page.bringToFront")
         except Exception:

@@ -44,6 +44,10 @@ DEFAULTS = {
     "creds": {
         "path": "~/.config/whu-paper-fetcher/creds.json",
     },
+    "request": {
+        "delay_seconds": 3,
+        "daily_limit": 50,
+    },
 }
 
 
@@ -98,6 +102,10 @@ class Config:
     @property
     def creds(self):
         return self._d.get("creds", {})
+
+    @property
+    def request(self):
+        return self._d.get("request", {})
 
 
 def load_config():

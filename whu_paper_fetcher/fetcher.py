@@ -6,6 +6,8 @@
 """
 import os
 import re
+import time
+import datetime
 import requests
 
 from .config import load_config, load_creds
@@ -16,6 +18,22 @@ from .sd_arp import fetch_fulltext, save_article_pdf
 from .validate import verify_pdf_matches
 
 _HEADERS = {"User-Agent": "whu-paper-fetcher/0.1 (+https://github.com/whu-paper-fetcher/whu-paper-fetcher)"}
+
+# 请求节流：避免对出版商/学校服务器造成负担，也降低触发限速或账号风控的概率。
+_daily_count = {}
+
+
+def _throttle(config):
+    delay = config.get("request", "delay_seconds", default=3)
+    if delay:
+        time.sleep(delay)
+    today = datetime.date.today().isoformat()
+    _daily_count[today] = _daily_count.get(today, 0) + 1
+    limit = config.get("request", "daily_limit", default=50)
+    if limit and _daily_count[today] > limit:
+        raise RuntimeError(
+            "已达每日下载上限 %d，已停止以避免触发出版商/学校限速。明日自动重置。" % limit
+        )
 
 
 def _sanitize(doi):
@@ -87,6 +105,7 @@ def fetch_by_doi(doi, config=None, backend_name=None, verify=None):
     pii, _ = resolve_doi(doi)
     result = {"doi": doi, "pii": pii, "oa": None, "whu": None, "pdf": None}
 
+    _throttle(config)
     if not skip_oa:
         oa = try_oa(doi, email, out_dir, tag, do_verify)
         if oa:
@@ -126,6 +145,7 @@ def fetch_many(dois, config=None, backend_name=None, verify=None):
     backend = None
     logged_in = False
     for doi in dois:
+        _throttle(config)
         tag = _sanitize(doi)
         pii, _ = resolve_doi(doi)
         res = {"doi": doi, "pii": pii, "oa": None, "whu": None, "pdf": None}
