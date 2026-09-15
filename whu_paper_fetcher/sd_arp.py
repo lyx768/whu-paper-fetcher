@@ -176,22 +176,49 @@ def fetch_fulltext(backend, pii, config, out_dir, tag=None, display_name=""):
     except Exception:
         pass
 
+    def _detail_body(request_id):
+        """取 network detail 的响应体。
+        注意：daemon 的 detail 常返回 {"body": "<html>", ...}。若直接对整字典 json.dumps，
+        内层引号会被转义成 \\"，后面的 entitledToken 正则必然失配（2026-09-15 实测）。"""
+        raw = backend.network_detail(request_id)
+        if isinstance(raw, dict) and isinstance(raw.get("body"), (str, dict)):
+            return raw["body"]
+        return raw
+
+    def _token_of(s):
+        if not isinstance(s, str):
+            return None
+        m = re.search(r'"entitledToken":"([A-Fa-f0-9]+)"', s)
+        return m.group(1) if m else None
+
     reqs = backend.network_list()
     hit = next((r for r in reqs
                 if ("/pii/%s" % pii) in r.get("url", "")
                 and (r.get("mimeType") or "").startswith("text/html")), None)
-    if not hit:
-        return None, "未捕获到文章 HTML 响应（可能 SSO 未建立或网络拦截）"
-    html = backend.network_detail(hit["requestId"])
-    if isinstance(html, dict):
-        html = json.dumps(html, ensure_ascii=False)
-    if not isinstance(html, str):
-        return None, "文章 HTML 为空"
+    html = ""
+    if hit:
+        raw = _detail_body(hit["requestId"])
+        if isinstance(raw, dict):
+            raw = json.dumps(raw, ensure_ascii=False)
+        if isinstance(raw, str):
+            html = raw
 
-    m = re.search(r'"entitledToken":"([A-Fa-f0-9]+)"', html)
-    if not m:
+    token = _token_of(html)
+    if not token:
+        # 回退：文章页命中浏览器缓存时不会产生新的网络请求，network 必然捕不到响应。
+        # 直接从页面 DOM 取完整 HTML（实测 daemon 可完整回传 ~2MB outerHTML）。
+        try:
+            dom = backend.eval_js("document.documentElement.outerHTML")
+        except Exception:
+            dom = None
+        if isinstance(dom, str):
+            token = _token_of(dom)
+            if token:
+                html = dom
+    if not token:
+        if not html:
+            return None, "未捕获到文章 HTML 响应，且 DOM 回退也未取到（可能 SSO 未建立或网络拦截）"
         return None, "HTML 中无 entitledToken（可能未授权或页面结构变化）"
-    token = m.group(1)
 
     # 3) 补回 ARP body 请求
     arp_url = "%s/sdfe/arp/pii/%s/body?entitledToken=%s" % (ersp_sd, pii, token)
@@ -201,11 +228,27 @@ def fetch_fulltext(backend, pii, config, out_dir, tag=None, display_name=""):
     body_hit = next((r for r in reqs2
                      if "/body?" in r.get("url", "")
                      and "json" in (r.get("mimeType") or "")), None)
-    if not body_hit:
-        return None, "未捕获到 ARP body 响应"
-    payload = backend.network_detail(body_hit["requestId"])
+    payload = None
+    if body_hit:
+        payload = _detail_body(body_hit["requestId"])
+        # daemon detail 可能返回 {"ok":false,"error":{...}}（如响应体已被浏览器回收，
+        # 报 "No resource with given identifier found"）——这种一律视为取不到，走下面的回退。
+        if isinstance(payload, dict) and payload.get("ok") is False and "error" in payload:
+            payload = None
+    if payload is None:
+        # 回退：ARP 端点是 application/json，浏览器会把它渲染成文本页，
+        # 直接取 body.innerText 即为完整 JSON（实测 2026-09-15 生效）。
+        try:
+            txt = backend.eval_js("document.body ? document.body.innerText : ''")
+        except Exception:
+            txt = None
+        if isinstance(txt, str) and txt.strip().startswith("{"):
+            try:
+                payload = json.loads(txt)
+            except Exception:
+                payload = None
     if not payload:
-        return None, "ARP body 为空"
+        return None, "ARP body 为空（network detail 与页面 innerText 两条路都失败）"
 
     os.makedirs(out_dir, exist_ok=True)
     tag = tag or pii
