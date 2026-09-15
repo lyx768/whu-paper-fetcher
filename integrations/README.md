@@ -129,7 +129,8 @@ AI 会自己：① 把标题解析成 DOI（如果你给的是标题）② 调 `
 
 | 现象 | 怎么办 |
 |---|---|
-| 说「遇到 Cloudflare 挑战页 / 需要登录」 | 工具不会绕过验证。**你手动用浏览器登录一次武大图书馆**，再让 AI 重试 |
+| 说「需要登录 / 凭证为空」 | 先回第 1 步确认凭证已写入且不是空值，然后重试 —— 正常情况下 CAS 会话会自动完成，不用你手动登 |
+| 被人机验证（Cloudflare 之类）挡住 | 工具不会绕过验证。**你手动过一次验证**，再让 AI 重试 |
 | 说「whu-paper-fetcher 未安装」 | 回到第 0 步重装；确认终端能跑 `whu-paper-fetcher --help` |
 | AI 说「没有下论文的工具」 | 第 2 步没接好，重启 AI 工具；或检查 skill/MCP 路径是否填对 |
 | 下载的文件打不开 | 工具已做双重校验；若仍异常，多半是该文不在武大权限内，换 OA 渠道或手动下 |
@@ -140,5 +141,7 @@ AI 会自己：① 把标题解析成 DOI（如果你给的是标题）② 调 `
 ## 给 AI 工具开发者 / 想自己接的人
 
 - `integrations/skill/SKILL.md` 是一个标准的 Claude Code 格式 skill，任何认这种格式的 agent（Codex/Claude Code/OpenCode/Qwen Code）直接复用。
+- `integrations/skill/references/fulltext-playbook.md` 是与 skill 配套的**实战手册**：非 Elsevier 各出版商的代理落点与 PDF 直链规律、拿正文文本与配图的取法（比 PDF 更适合喂给 AI 精读）、矢量图整页渲染、拦截处置与坑清单。CLI 覆盖不到时 agent 会去查它。
+  > 该手册由作者的本地实战 skill 用 `scripts/sync_skill.py` 同步生成（写入前自动脱敏本地路径与姓名）。若你也维护自己的版本，可以照这个模式接一条同步命令，别手抄。
 - `integrations/mcp/server.py` 是一个 stdio MCP server，包装了 CLI，任何支持 MCP 的客户端都能接。
 - 详细安全与合规说明见仓库根目录 `DISCLAIMER.md`。仅限个人学术用途。
