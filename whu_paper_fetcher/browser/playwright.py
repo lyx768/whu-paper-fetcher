@@ -13,6 +13,11 @@ import json
 import threading
 from .base import BrowserBackend
 
+# 2026-09-16 实测：ersp EZproxy 对 HeadlessChrome UA 直接断连（ERR_EMPTY_RESPONSE）。
+# 必须伪装成真实 Edge 的 UA（同手册 IEEE 专节"精确 UA"教训）。过期后从本机 Edge 更新。
+EDGE_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+           "(KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36 Edg/153.0.0.0")
+
 
 class PlaywrightBackend(BrowserBackend):
     def __init__(self, browser_name="chromium", config=None, headless=True):
@@ -34,8 +39,12 @@ class PlaywrightBackend(BrowserBackend):
             return
         from playwright.sync_api import sync_playwright
         self._pw = sync_playwright().start()
+        # 2026-09-16 实测链路：metaersp/ersp（国内直连）+ www.metaauth.com（国外，
+        # 被墙）——必须走系统代理的分流规则（用户 Clash 国内直连/国外走节点），
+        # 不能加 --no-proxy-server（那会墙死 metaauth）。UA 伪装见 EDGE_UA。
         self._browser = getattr(self._pw, self.browser_name).launch(headless=self._headless)
-        self._context = self._browser.new_context()
+        self._context = self._browser.new_context(
+            user_agent=EDGE_UA)   # 手册 IEEE 专节教训：EZproxy 绑 UA，HeadlessChrome 被 ersp 掐断连接
         self._page = self._context.new_page()
         self._page.on("response", self._on_response)
         self._page.on("dialog", self._on_dialog)
