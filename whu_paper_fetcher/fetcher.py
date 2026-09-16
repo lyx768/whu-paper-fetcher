@@ -16,6 +16,19 @@ from .oa import oa_pdf_url, download_url
 from .whu_auth import autologin
 from .sd_arp import fetch_fulltext, save_article_pdf
 from .validate import verify_pdf_matches
+from . import sfx
+
+
+def _establish_session(backend, doi):
+    """SFX-by-DOI 建立 EZproxy 会话（用户 2026-09-14 教的权威路径）。
+    失败只记 note，不阻断——旧直连路径仍可尝试。"""
+    try:
+        r = sfx.resolve(doi, backend)
+        if r.get("ok"):
+            return {"sfx": "ok", "final_url": r.get("final_url", "")[:160]}
+        return {"sfx": "skip", "note": r.get("reason", "")[:160]}
+    except Exception as e:
+        return {"sfx": "skip", "note": str(e)[:160]}
 
 _HEADERS = {"User-Agent": "whu-paper-fetcher/0.1 (+https://github.com/whu-paper-fetcher/whu-paper-fetcher)"}
 
@@ -124,8 +137,13 @@ def fetch_by_doi(doi, config=None, backend_name=None, verify=None):
         backend.close()
         result["whu"] = {"error": "LOGIN_FAILED", "note": "CAS 登录失败（凭证缺失或表单变化）"}
         return result
+    sfxr = _establish_session(backend, doi)
     result["whu"] = fetch_whu(backend, doi, pii, config, out_dir, tag,
                               config.get("whu", "display_name", default=""))
+    if isinstance(result["whu"], dict):
+        result["whu"]["sfx"] = sfxr.get("sfx")
+        if sfxr.get("note"):
+            result["whu"]["sfx_note"] = sfxr["note"]
     if result["whu"] and result["whu"].get("pdf"):
         result["pdf"] = result["whu"]["pdf"]
     backend.close()
@@ -176,8 +194,13 @@ def fetch_many(dois, config=None, backend_name=None, verify=None):
                 continue
             logged_in = True
 
+        sfxr = _establish_session(backend, doi)
         res["whu"] = fetch_whu(backend, doi, pii, config, out_dir, tag,
                                config.get("whu", "display_name", default=""))
+        if isinstance(res["whu"], dict):
+            res["whu"]["sfx"] = sfxr.get("sfx")
+            if sfxr.get("note"):
+                res["whu"]["sfx_note"] = sfxr["note"]
         if res["whu"] and res["whu"].get("pdf"):
             res["pdf"] = res["whu"]["pdf"]
         results.append(res)

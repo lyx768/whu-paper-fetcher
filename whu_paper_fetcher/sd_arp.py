@@ -5,8 +5,10 @@
 但 JS 拼出的 ARP 地址绕过了代理前缀，导致正文请求失败、页面只剩摘要。
 本模块手工补回该请求，直接取纯文本全文（无需 TDM API key）。
 
-注意：武大 EZproxy 会话最稳的入口是 whu.metaersp.cn 门户 SSO，
-再站内跳转 ersp（直接 navigate ersp 会被 CAS 拦回登录页）。
+注意：EZproxy 会话的权威建立路径是 SFX-by-DOI（见 sfx.py，用户 2026-09-14 教的
+"从 WOS/SFX 那端直接进"），fetcher 在 ARP 之前会先走 SFX resolver 落 EZproxy 深链。
+直怼 ersp 深链或 whu.metaersp.cn 门户都不是首选——前者被 CAS 拦回登录页，后者是
+临时手动路径。
 """
 import json
 import os
