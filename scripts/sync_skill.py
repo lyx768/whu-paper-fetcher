@@ -111,8 +111,11 @@ def main():
             old = f.read()
 
     if args.check:
-        if old == out:
-            print("同步一致，无需更新。")
+        # HEADER 里嵌了「同步日期：{today}」，日期一变 --check 就会每天误报。
+        # 比对时把日期行挖掉，只有真实内容差异才算差异。
+        date_line = re.compile(r"(?m)^.*同步日期：\d{4}-\d{2}-\d{2}.*$")
+        if date_line.sub("", old) == date_line.sub("", out):
+            print("同步一致（仅日期戳不同），无需更新。")
             return 0
         print("有差异：本地 %d 字符 / 仓库 %d 字符" % (len(out), len(old)))
         return 1
