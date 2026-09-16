@@ -7,6 +7,11 @@ import json
 import urllib.request
 from .base import BrowserBackend
 
+# 2026-09-16 实测坑：urllib 默认读系统代理（用户日常挂 VPN，http_proxy→127.0.0.1:27890），
+# 连 127.0.0.1:10086 的 daemon 请求也被劫持进代理 → 502，表现为"时好时坏"。
+# 本地回环调用必须绕过一切代理。
+_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
 
 class WebBridgeBackend(BrowserBackend):
     def __init__(self, url, session):
@@ -18,7 +23,7 @@ class WebBridgeBackend(BrowserBackend):
         req = urllib.request.Request(
             self.url, data=body, headers={"Content-Type": "application/json"}
         )
-        with urllib.request.urlopen(req, timeout=timeout) as r:
+        with _OPENER.open(req, timeout=timeout) as r:
             return json.loads(r.read().decode("utf-8"))
 
     def _ok(self, resp):
