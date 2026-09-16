@@ -1,6 +1,6 @@
 [project]
 name = "whu-paper-fetcher"
-version = "0.1.0"
+version = "0.2.0"
 description = "武大专属文献全文获取工具：武大 CAS 自动登录 + ersp EZproxy + ScienceDirect ARP 全文接口，OA 渠道兜底。"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -14,7 +14,9 @@ dependencies = [
 
 [project.optional-dependencies]
 # Playwright backend (portable, default for classmates without Kimi WebBridge)
-browser = ["playwright>=1.40"]
+# curl_cffi 必备：ersp WAF 在 TLS/HTTP2 指纹层掐 chromium，playwright 只做 SSO，
+# ersp 域全部请求由 curl_cffi(impersonate="chrome") 承接（2026-09-16 实测）
+browser = ["playwright>=1.40", "curl_cffi>=0.6"]
 # Stricter PDF verification (first-page text match against the target paper)
 verify = ["pymupdf>=1.23"]
 

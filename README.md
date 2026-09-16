@@ -10,8 +10,9 @@
 
 核心能力（**武大专属、别处没有**）：
 
-- **武大 CAS 自动登录** —— 经浏览器后端复用你的武大账号会话，无需每次手填
+- **武大 CAS 自动登录** —— 本地凭证自动填表，全程无窗无感；仅在触发 MFA/验证码时提示你手动处理
 - **`whu.metaersp.cn` 门户 SSO → `ersp.lib.whu.edu.cn` EZproxy** 的完整访问链路
+- **全自动无感取全文** —— Playwright 无头只做 SSO，`ersp` 域请求由 curl_cffi（Chrome TLS 指纹）承接，绕过 EZproxy 对自动化浏览器的指纹拦截
 - **ScienceDirect ARP 纯文本全文接口** —— 免 TDM API key 直接拿到正文（这是本工具最有价值的部分）
 - **OA 四连兜底** —— Unpaywall / Semantic Scholar / OpenAlex / Europe PMC，能白嫖先白嫖
 
@@ -33,10 +34,10 @@ OA 兜底逻辑内联（约百行），避免同学再装一套通用工具的�
 ## 安装
 
 ```bash
-git clone https://github.com/<你的账号>/whu-paper-fetcher.git
+git clone https://github.com/lyx768/whu-paper-fetcher.git
 cd whu-paper-fetcher
 pip install -e .                       # 核心（OA + WHU 访问）
-pip install -e '.[browser]'           # + Playwright 后端（同学默认用这个）
+pip install -e '.[browser]'           # + Playwright 后端 + curl_cffi（同学默认用这个）
 pip install -e '.[verify]'            # + pymupdf（下载后做首页文本校验）
 ```
 
@@ -112,12 +113,12 @@ whu-paper-fetcher --doi 10.xxxx/xxx --json
 
 | 后端 | 适用 | 说明 |
 |---|---|---|
-| `playwright`（默认） | 同学 | 用 Playwright 驱动本机 Chromium，无第三方依赖。首次需手动过一次武大 SSO，之后由 creds 自动登录 |
+| `playwright`（默认） | 同学 | Playwright 无头 Chromium 做 SSO + curl_cffi 承接全文请求，无第三方扩展依赖。本地凭证自动登录，无窗无感 |
 | `webbridge` | 你自己 | 复用 Kimi WebBridge 扩展 + 本地 daemon（`127.0.0.1:10086`），复用已登录的 Edge 会话 |
 
 > 注意：ScienceDirect 等站点可能出现人机验证（CAPTCHA / Turnstile）挑战页。
-> **本工具不提供绕过验证的方法**；遇到挑战页请手动完成验证后重试。Playwright 后端默认以有头模式启动，
-> 若遇到挑战页卡死，把浏览器窗口放到前台再重试。
+> **本工具不提供绕过验证的方法**；遇到挑战请手动完成后重试。Playwright 后端默认**无头模式**
+> （不弹任何窗口），若返回 `MFA_REQUIRED`，说明账号触发了二次验证，需你手动登录一次校内门户再重试。
 
 ---
 
@@ -134,8 +135,9 @@ whu-paper-fetcher --doi 10.xxxx/xxx --json
 ## 已知限制
 
 - 武大 EZproxy 会话约 **1 天过期**，过期后重新运行会自动重登（除非触发 MFA）。
-- SD ARP 全文为纯文本；若需出版社排版版 PDF，走页面渲染兜底（版式非官方）。
-- Playwright 后端已通过本地冒烟测试（见 `tests/`），但**真实武大 SSO 登录与网站结构变化**仍需你/同学实测；如遇选择器变化请提 issue。
+- SD ARP 全文为纯文本；附带的 PDF 为页面打印渲染版（版式非出版社排版件，工具会标注）。
+- 学校 EZproxy 依赖浏览器指纹策略：UA 伪装 + curl_cffi（Chrome TLS 指纹）已实测通过；
+  若学校侧策略升级导致断连，请提 issue 并附 JSON 输出的错误码。
 - 非 SD 出版商（Wiley / T&F / Springer 等）走 OA 兜底；未做各家 EZproxy 适配。
 
 ---
