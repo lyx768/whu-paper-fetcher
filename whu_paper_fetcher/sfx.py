@@ -25,6 +25,16 @@ SFX_BASE = "https://whu-sfx.exlibrisgroup.com.cn/86whu"
 _MENU_MARK = "由武汉大学的SFX提供"
 
 
+def _trace(backend, url):
+    """调试辅助：把重定向链上每个落点写本地 trace 文件（不进 stdout/日志，避免刷屏）。"""
+    try:
+        body = _eval(backend, "(()=>document.body?document.body.innerText.slice(0,200):'')()") or ""
+        with open(r"F:\AGENT\work\temp\sfx_trace.log", "a", encoding="utf-8") as f:
+            f.write("URL: %s\nBODY: %s\n---\n" % (url[:150], body.replace("\n", " ")[:180]))
+    except Exception:
+        pass
+
+
 def sfx_openurl(doi):
     q = urllib.parse.quote(doi, safe="")
     return (SFX_BASE + "?url_ver=Z39.88-2004"
@@ -42,11 +52,41 @@ def _eval(backend, code, timeout=30):
     return d if isinstance(d, str) else json.dumps(d, ensure_ascii=False) if d else ""
 
 
+def inject_cookies(backend, cookies):
+    """注入从日常 Edge 导出的 cookie，让 headless context 复用已有 SFX/EZproxy 会话
+    （手册 IEEE 专节同款手法）。cookies 接受 CDP Network.getAllCookies 的结果：
+    [{"name","value","domain","path"}, ...]。前置：backend 已启动（有 _context）。"""
+    if isinstance(cookies, dict) and "cookies" in cookies:
+        cookies = cookies["cookies"]
+    clean = []
+    for c in list(cookies or []):
+        cc = {k: c[k] for k in ("name", "value", "domain", "path") if k in c}
+        if {"name", "value"} <= set(cc) and "domain" in cc:
+            cc.setdefault("path", "/")
+            clean.append(cc)
+    if hasattr(backend, "_ensure"):
+        backend._ensure()
+    ctx = getattr(backend, "_context", None)
+    if ctx is None or not clean:
+        return False
+    ctx.add_cookies(clean)
+    return True
+
+
 def resolve(doi, backend, wait=6):
     """SFX 解析 DOI 并落地 EZproxy 深链（会话建立）。
 
     返回 dict：ok / final_url（EZproxy 深链）或 reason。
     任何一步失败都返回 ok=False——调用方自行决定降级（原直连路径）。
+
+    当前状态（2026-09-16 实测）：
+      ✅ headless 下 SFX OpenURL 菜单页正常（解析表单、"电子全文"服务都在）
+      ✅ 点 "Go"（type=button + onclick=openSFXMenuLink(...,'_blank')，需覆写
+         window.open 才能让目标落在主 frame，否则它开新窗）
+      ❌ 最后一环：resolver 302 需要 SFX SSO（metaauth/CAS）；全新 headless context
+         没有 SFX 会话 cookie，被弹回菜单页。解法二选一：
+         a) 从用户日常 Edge 导出 whu-sfx/ersp cookie 注入本 context（手册 IEEE 专节已验证的手法）
+         b) 在 headless 里打通 metaauth serviceValidate 全链（工程量大）
     """
     out = {"ok": False, "final_url": "", "reason": ""}
     backend.open(sfx_openurl(doi))
@@ -79,20 +119,44 @@ def resolve(doi, backend, wait=6):
         out["reason"] = "SFX_NO_RESOLVER_FORM(可能只有DOI/CALIS文献传递服务)"
         return out
 
-    # 3) 拼 sfxresolver.cgi GET → navigate → 302 落 EZproxy 深链
-    action = form.pop("action")
-    qs = urllib.parse.urlencode({k: v for k, v in form.items() if v})
-    sep = "&" if "?" in action else "?"
-    resolver_url = action if action.startswith("http") else (
-        SFX_BASE + (action if action.startswith("/") else "/" + action) + sep + qs)
-    backend.open(resolver_url)
-    time.sleep(5)
+    # 3) 真实点击 "Go"（与用户手动一致），但先覆写 window.open 把 _blank 目标
+    #    重定向到当前 frame —— 红线：不弹任何窗口，用户无感。
+    #    Go 按钮 type=button + onclick="openSFXMenuLink(...,'_blank')"，
+    #    这解释了 f.submit() 无效与主 frame 永不动。
+    r = _eval(backend,
+              "(()=>{const f=document.forms['basic1'];if(!f)return 'NOFORM';"
+              "window.__origOpen=window.open;"
+              "window.open=function(u){if(u){location.href=String(u);}return null;};"
+              "const s=f.querySelector('input[type=button],input[type=submit],button');"
+              "if(!s)return 'NOBTN'; s.click(); return 'CLICKED';})()")
+    if r != "CLICKED":
+        out["reason"] = "SFX_NO_GO_BUTTON(%s)" % r
+        return out
+    time.sleep(4)
 
-    landing = _eval(backend, "(()=>location.href)()")
-    out["final_url"] = (landing or "").strip()
-    if "ersp.lib.whu.edu.cn" in out["final_url"] or "EZproxy" in out["final_url"]:
+    landing = ""
+    for _ in range(15):
+        time.sleep(2)
+        try:
+            u = _eval(backend, "(()=>location.href)()")
+        except Exception:
+            continue                       # 页面正在重定向链中，context 暂不可用
+        if u and u != landing:
+            landing = u
+            _trace(backend, landing)       # 调试：记录每次落点及页面摘要
+        if landing and ("ersp.lib.whu.edu.cn" in landing
+                        or "lib.whu.edu.cn" in landing
+                        or ("sciencedirect" in landing and "exlibrisgroup" not in landing)):
+            break
+        if landing and "authserver/login" in landing:
+            out["reason"] = "CAS_SSO_NOT_PASSED(未登录或 TGT 失效) landing=%s" % landing[:120]
+            return out
+
+    out["final_url"] = landing
+    if landing and ("ersp.lib.whu.edu.cn" in landing or "lib.whu.edu.cn" in landing
+                    or ("sciencedirect" in landing and "exlibrisgroup" not in landing)):
         out["ok"] = True
         out["reason"] = "via SFX sfxresolver"
     else:
-        out["reason"] = "landing=%s" % out["final_url"][:140]
+        out["reason"] = "landing=%s" % landing[:140]
     return out

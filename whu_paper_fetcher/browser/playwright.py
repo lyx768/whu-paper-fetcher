@@ -1,9 +1,13 @@
 """Playwright 后端：用 Playwright 驱动本机 Chromium（便携默认，同学用）。
 
 不依赖任何第三方浏览器扩展，pip install 'whu-paper-fetcher[browser]' 即可。
-注意：ScienceDirect 的 Cloudflare 挑战页在隐藏/无头窗口下可能挂起，
-本后端默认以有头模式启动（headless=False）。首次运行需手动完成一次武大 SSO 登录，
-之后由 whu_auth 用本地 creds 文件自动登录。
+
+⚠️ 红线（用户 2026-09-16 明确）：**不得弹出界面，必须用户无感** —— 默认
+headless=True。CAS 登录用本地 creds 自动填表；若遇到必须人工交互的场景
+（MFA/验证码），返回 MFA_REQUIRED 让调用方提示用户，绝不为此弹窗。
+
+ Cloudflare 类挑战页在无头下可能挂起：实测 ARP/SFX 路线不走 Cloudflare
+（Elsevier 拦的是直怼原站，SFX/EZproxy 域不设防），所以无头可用。
 """
 import json
 import threading
@@ -11,9 +15,10 @@ from .base import BrowserBackend
 
 
 class PlaywrightBackend(BrowserBackend):
-    def __init__(self, browser_name="chromium", config=None):
+    def __init__(self, browser_name="chromium", config=None, headless=True):
         self.browser_name = browser_name
         self._display_name = (config.whu.get("display_name", "") if config else "")
+        self._headless = headless
         self._pw = None
         self._browser = None
         self._context = None
@@ -29,7 +34,7 @@ class PlaywrightBackend(BrowserBackend):
             return
         from playwright.sync_api import sync_playwright
         self._pw = sync_playwright().start()
-        self._browser = getattr(self._pw, self.browser_name).launch(headless=False)
+        self._browser = getattr(self._pw, self.browser_name).launch(headless=self._headless)
         self._context = self._browser.new_context()
         self._page = self._context.new_page()
         self._page.on("response", self._on_response)
