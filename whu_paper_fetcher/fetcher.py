@@ -95,6 +95,25 @@ def fetch_whu(backend, doi, pii, config, out_dir, tag, display_name):
     """走武大 ersp 代理取 SD 全文。backend 必须已登录 CAS。"""
     if not pii:
         return {"error": "NO_PII", "note": "Crossref 未解析到 PII，无法走 SD 全文接口"}
+
+    # 首选：无感全自动链路（2026-09-16 打通）——playwright 只做 SSO，
+    # ersp 域请求交给 curl_cffi（chromium TLS 指纹被 ersp WAF 掐，UA 伪装救不了）
+    try:
+        from .pure_fetch import fetch_fulltext_curlcffi
+        paths, err = fetch_fulltext_curlcffi(backend, doi, pii, config,
+                                             out_dir, tag=tag, display_name=display_name)
+        if err:
+            return {"error": "ARP_FAILED", "note": err, "via": "curl_cffi"}
+        rec = {"fulltext_md": paths["markdown"], "body_json": paths["body"],
+               "html": paths["html"], "via": "curl_cffi"}
+        pdf_path = os.path.join(out_dir, f"{tag}.pdf")
+        if save_article_pdf(backend, pii, config, pdf_path):
+            rec["pdf"] = pdf_path
+        return rec
+    except ImportError:
+        pass  # 环境没装 curl_cffi 时退回旧路径
+
+    # 旧路径：daemon/浏览器捕获 ARP 响应（要求真实 Edge TLS 指纹，headless 常被掐）
     paths, err = fetch_fulltext(backend, pii, config, out_dir, tag=tag, display_name=display_name)
     if err:
         return {"error": "ARP_FAILED", "note": err}
