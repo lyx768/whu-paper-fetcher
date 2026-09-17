@@ -14,6 +14,7 @@
 - **`whu.metaersp.cn` 门户 SSO → `ersp.lib.whu.edu.cn` EZproxy** 的完整访问链路
 - **全自动无感取全文** —— Playwright 无头只做 SSO，`ersp` 域请求由 curl_cffi（Chrome TLS 指纹）承接，绕过 EZproxy 对自动化浏览器的指纹拦截
 - **ScienceDirect ARP 纯文本全文接口** —— 免 TDM API key 直接拿到正文（这是本工具最有价值的部分）
+- **出版社无关通用 EZproxy 路由** —— Wiley / Springer / T&F 等无 SD-PII 的出版商，经 `metaersp middle` → `ersp` EZproxy 深链（`G.https` 前缀）→ curl_cffi 抓文章页全文；PDF 尽力而为（Wiley 为 token 化重定向）
 - **OA 四连兜底** —— Unpaywall / Semantic Scholar / OpenAlex / Europe PMC，能白嫖先白嫖
 
 > 设计定位：服务武大同学。你只需 `pip install` + 配个武大账号，给 DOI 就能用。
@@ -138,7 +139,9 @@ whu-paper-fetcher --doi 10.xxxx/xxx --json
 - SD ARP 全文为纯文本；附带的 PDF 为页面打印渲染版（版式非出版社排版件，工具会标注）。
 - 学校 EZproxy 依赖浏览器指纹策略：UA 伪装 + curl_cffi（Chrome TLS 指纹）已实测通过；
   若学校侧策略升级导致断连，请提 issue 并附 JSON 输出的错误码。
-- 非 SD 出版商（Wiley / T&F / Springer 等）走 OA 兜底；未做各家 EZproxy 适配。
+- 非 SD 出版商（Wiley / Springer / T&F 等）现走**通用 EZproxy 路由**（`metaersp middle` + curl_cffi）取文章页全文；
+  Wiley 的 PDF 为 token 化重定向（非直链），故 PDF 尽力取，文章页全文即满足"全文级"。
+  若某出版商在 headless 导航被 Cloudflare 拦截，可改用 `webbridge` 后端复用已登录的 Edge 会话。
 
 ---
 

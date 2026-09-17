@@ -54,7 +54,7 @@ def _sanitize(doi):
 
 
 def resolve_doi(doi):
-    """返回 (pii, title)。pii 解析不到时返回 (None, title)。"""
+    """返回 (pii, title)。pii 解析不到、或解析到的 alternative-id 实为 DOI 本身时返回 (None, title)。"""
     try:
         r = requests.get(f"https://api.crossref.org/works/{doi}", headers=_HEADERS, timeout=20)
         if r.status_code == 200:
@@ -63,6 +63,10 @@ def resolve_doi(doi):
             title = ""
             if msg.get("title"):
                 title = msg["title"][0] if isinstance(msg["title"], list) else msg["title"]
+            # 真实 SD PII 形如 S0038-0717(21)00234-5，绝不以 "10." 开头；
+            # Wiley/Springer 等会把 DOI 本身塞进 alternative-id，需剔除，否则误走 SD 路线
+            if pii and pii.startswith("10."):
+                pii = None
             return pii, title
     except Exception:
         pass
@@ -92,10 +96,33 @@ def try_oa(doi, email, out_dir, tag, verify):
 
 
 def fetch_whu(backend, doi, pii, config, out_dir, tag, display_name):
-    """走武大 ersp 代理取 SD 全文。backend 必须已登录 CAS。"""
-    if not pii:
-        return {"error": "NO_PII", "note": "Crossref 未解析到 PII，无法走 SD 全文接口"}
+    """走武大 ersp 代理取全文。backend 必须已登录 CAS。
+    - 有 PII（Elsevier/ScienceDirect）：走 SD ARP 纯文本接口（pure_fetch）。
+    - 无 PII（Wiley / Springer / T&F 等）：走通用 EZproxy 路由（ezproxy）。
+    """
+    if pii:
+        return _fetch_whu_sd(backend, doi, pii, config, out_dir, tag, display_name)
 
+    # 通用 EZproxy（出版社无关，2026-09-17 突破并固化）
+    try:
+        from .ezproxy import fetch_generic
+        paths, err = fetch_generic(backend, doi, config, out_dir,
+                                   tag=tag, display_name=display_name)
+        if err:
+            return {"error": "EZPROXY_FAILED", "note": err, "via": "curl_cffi_generic"}
+        rec = {"html": paths["html"], "via": "curl_cffi_generic"}
+        if paths.get("fulltext_txt"):
+            rec["fulltext_txt"] = paths["fulltext_txt"]
+        if paths.get("pdf"):
+            rec["pdf"] = paths["pdf"]
+        return rec
+    except ImportError:
+        return {"error": "NO_PII", "note": "无 PII；通用 EZproxy 路由需 curl_cffi"
+                                      "（pip install -e '.[browser]'）"}
+
+
+def _fetch_whu_sd(backend, doi, pii, config, out_dir, tag, display_name):
+    """SD（Elsevier）专用：走 ersp EZproxy + SD ARP 全文接口。"""
     # 首选：无感全自动链路（2026-09-16 打通）——playwright 只做 SSO，
     # ersp 域请求交给 curl_cffi（chromium TLS 指纹被 ersp WAF 掐，UA 伪装救不了）
     try:
